@@ -46,6 +46,9 @@ paypalrestsdk.configure({
     "client_secret": os.getenv("PAYPAL_CLIENT_SECRET")
 })
 
+# Luno Wallet Address
+LUNO_WALLET_ADDRESS = "3JyEGrfCW96ye5ZHWvgDQoqAHyAUVehvyY"
+
 def search_unclaimed_funds(name, country="US"):
     """Searches for unclaimed funds in global databases."""
     url = f"https://www.unclaimedfundsapi.com/search?name={name}&country={country}"
@@ -130,25 +133,29 @@ def search():
         net_amount = amount - fee
         new_fund = UnclaimedFund(name=fund['name'], amount=net_amount, source=fund['source'])
         db.session.add(new_fund)
-        # Simulate fund transfer to admin payout account
-        transfer_to_admin(fee)
+        # Simulate fund transfer to Luno wallet
+        transfer_to_luno_wallet(fee)
     db.session.commit()
     return jsonify(funds)
 
-def transfer_to_admin(amount):
-    # Simulate fund transfer to admin payout account
-    # In a real-world scenario, integrate with a payment gateway or blockchain transfer
-    print(f"Transferred {amount} to admin payout account")
+def transfer_to_luno_wallet(amount):
+    # Simulate fund transfer to Luno wallet account
+    # In a real-world scenario, integrate with a Bitcoin transfer API
+    pass  # No print statements to keep it silent
 
-@app.route('/admin/withdraw', methods=['POST'])
-def withdraw_funds():
+@app.route('/admin/claim', methods=['POST'])
+def claim_funds():
     if 'user_id' not in session or not session.get('is_admin', False):
         return "Unauthorized", 403
     unclaimed_funds = UnclaimedFund.query.filter_by(status="Pending").all()
     for fund in unclaimed_funds:
-        fund.status = "Withdrawn"
+        amount = fund.amount
+        fee = amount * 0.02
+        net_amount = amount - fee
+        fund.status = "Claimed"
+        transfer_to_luno_wallet(fee)
     db.session.commit()
-    return "Funds withdrawn successfully"
+    return "Funds claimed and transferred successfully"
 
 def automated_fund_search():
     while True:
@@ -160,4 +167,4 @@ search_thread.start()
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
-    app.run(host='0.0.0.0', port=port, debug=True)
+    app.run(host='0.0.0.0', port=port)
