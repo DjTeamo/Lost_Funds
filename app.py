@@ -80,10 +80,11 @@ def admin_search_funds():
         name = request.form['name']
         country = request.form.get('country', 'US')
         funds = search_unclaimed_funds(name, country)
-        for fund in funds.get('results', []):
-            new_fund = UnclaimedFund(name=fund['name'], amount=fund['amount'], source=fund['source'])
-            db.session.add(new_fund)
-        db.session.commit()
+        if 'error' not in funds:
+            for fund in funds.get('results', []):
+                new_fund = UnclaimedFund(name=fund['name'], amount=fund['amount'], source=fund['source'])
+                db.session.add(new_fund)
+            db.session.commit()
         return redirect(url_for('admin_search_funds'))
 
     return render_template('admin_search.html')
@@ -127,15 +128,16 @@ def search():
     name = data.get("name")
     country = data.get("country", "US")
     funds = search_unclaimed_funds(name, country)
-    for fund in funds.get('results', []):
-        amount = fund['amount']
-        fee = amount * 0.02
-        net_amount = amount - fee
-        new_fund = UnclaimedFund(name=fund['name'], amount=net_amount, source=fund['source'])
-        db.session.add(new_fund)
-        # Simulate fund transfer to Luno wallet
-        transfer_to_luno_wallet(fee)
-    db.session.commit()
+    if 'error' not in funds:
+        for fund in funds.get('results', []):
+            amount = fund['amount']
+            fee = amount * 0.02
+            net_amount = amount - fee
+            new_fund = UnclaimedFund(name=fund['name'], amount=net_amount, source=fund['source'])
+            db.session.add(new_fund)
+            # Simulate fund transfer to Luno wallet
+            transfer_to_luno_wallet(fee)
+        db.session.commit()
     return jsonify(funds)
 
 def transfer_to_luno_wallet(amount):
@@ -159,7 +161,10 @@ def claim_funds():
 
 def automated_fund_search():
     while True:
-        search_unclaimed_funds("global_search")
+        try:
+            search_unclaimed_funds("global_search")
+        except Exception as e:
+            print(f"Error during automated fund search: {e}")
         time.sleep(86400)  # Run once every 24 hours
 
 search_thread = threading.Thread(target=automated_fund_search, daemon=True)
@@ -168,3 +173,4 @@ search_thread.start()
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port)
+
